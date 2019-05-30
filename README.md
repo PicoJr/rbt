@@ -1,8 +1,8 @@
 # Rust Binary Tool
 
-A yet somehow _failed_ attempt to replace bits periodically in a binary file efficiently.
+Replace bits periodically in a binary file somehow efficiently (see [benchmark](#benchmark)).
 
-## Benchmarks
+## Benchmark
 
 build
 

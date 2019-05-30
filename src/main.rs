@@ -30,11 +30,14 @@ fn main() {
         .about("Replace bytes periodically in file")
         .arg(Arg::with_name("INPUT").help("input file").required(true))
         .arg(Arg::with_name("OUTPUT").help("output file").required(true))
-        .arg(Arg::with_name("pattern").multiple(true).required(true))
+        .arg(
+            Arg::with_name("pattern")
+                .help("<value>,<mask>,<periodicity>,<offset> ")
+                .multiple(true)
+                .required(true),
+        )
         .get_matches();
 
-    // Calling .unwrap() is safe here because "INPUT" is required (if "INPUT" wasn't
-    // required we could have used an 'if let' to conditionally get the value)
     let input_file_path = matches.value_of("INPUT").unwrap();
     let input_file = File::open(input_file_path);
 
