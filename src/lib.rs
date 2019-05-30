@@ -69,12 +69,14 @@ pub mod pattern {
                 // previous test guarantees that next statement will evaluate to >= 0
                 let position_in_pattern = (position - self.offset) % self.periodicity;
                 if position_in_pattern < self.value.len() {
-                    (self.mask[position_in_pattern] & self.value[position_in_pattern]) | (!self.mask[position_in_pattern] & value)
-                } else { value }
+                    (self.mask[position_in_pattern] & self.value[position_in_pattern])
+                        | (!self.mask[position_in_pattern] & value)
+                } else {
+                    value
+                }
             } else {
                 value
             }
         }
     }
 }
-
