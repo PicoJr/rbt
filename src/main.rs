@@ -7,6 +7,8 @@ use clap::{App, Arg};
 
 use rbt::pattern::Pattern;
 
+const BUFFER_SIZE: usize = 4000; // 4KB
+
 fn remove_leading_zeros(v: &[u8]) -> Vec<u8> {
     let mut non_zero_found = false;
     let mut rv: Vec<u8> = vec![];
@@ -66,18 +68,22 @@ fn main() {
         (Err(e), _) => println!("error while opening {}: {}", input_file_path, e),
         (_, Err(e)) => println!("error while opening {}: {}", output_file_path, e),
         (Ok(input), Ok(output)) => {
-            let reader = BufReader::new(input);
+            let mut reader = BufReader::new(input);
             let mut writer = BufWriter::new(output);
 
-            let mut value: u8;
-            for (position, b) in reader.bytes().enumerate() {
-                if let Ok(byte) = b {
-                    value = byte;
-                    for pattern in &patterns {
-                        value = pattern.compute_pattern(position, value);
-                    }
-                    writer.write_all(&[value]).expect("write error");
+            let mut position = 0;
+            let mut buffer = [0; BUFFER_SIZE];
+            while let Ok(size) = reader.read(&mut buffer) {
+                if size == 0 {
+                    break;
                 }
+                for (i, item) in buffer.iter_mut().enumerate().take(size) {
+                    for pattern in &patterns {
+                        *item = pattern.compute_pattern(position + i, *item);
+                    }
+                }
+                position += size;
+                writer.write_all(&buffer[..size]).expect("write error");
             }
         }
     }
