@@ -1,43 +1,84 @@
-// (Full example with detailed comments in examples/17_yaml.rs)
-//
-// This example demonstrates clap's building from YAML style of creating arguments which is far
-// more clean, but takes a very small performance hit compared to the other two methods.
-#[macro_use]
 extern crate clap;
-use clap::App;
+
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufWriter, Read, Write};
+
+use clap::{App, Arg};
+
+use rbt::pattern::Pattern;
+
+fn remove_leading_zeros(v: &[u8]) -> Vec<u8> {
+    let mut non_zero_found = false;
+    let mut rv: Vec<u8> = vec![];
+    for &e in v {
+        if e != 0 {
+            non_zero_found = true;
+            rv.push(e);
+        } else if e == 0 && non_zero_found {
+            rv.push(e);
+        }
+    }
+    rv
+}
 
 fn main() {
-    // The YAML file is found relative to the current file, similar to how modules are found
-    let yaml = load_yaml!("cli.yml");
-    let matches = App::from_yaml(yaml).get_matches();
-
-    // Same as previous examples...
-    // Gets a value for config if supplied by user, or defaults to "default.conf"
-    let config = matches.value_of("config").unwrap_or("default.conf");
-    println!("Value for config: {}", config);
+    let matches = App::new("ReplaceBytesTool")
+        .version("1.0")
+        .author("PicoJr")
+        .about("Replace bytes periodically in file")
+        .arg(Arg::with_name("INPUT")
+            .help("input file")
+            .required(true)
+        )
+        .arg(Arg::with_name("OUTPUT")
+            .help("output file")
+            .required(true))
+        .arg(Arg::with_name("pattern")
+            .multiple(true).required(true))
+        .get_matches();
 
     // Calling .unwrap() is safe here because "INPUT" is required (if "INPUT" wasn't
     // required we could have used an 'if let' to conditionally get the value)
-    println!("Using input file: {}", matches.value_of("INPUT").unwrap());
+    let input_file_path = matches.value_of("INPUT").unwrap();
+    let input_file = File::open(input_file_path);
 
-    // Vary the output based on how many times the user used the "verbose" flag
-    // (i.e. 'myprog -v -v -v' or 'myprog -vvv' vs 'myprog -v'
-    match matches.occurrences_of("v") {
-        0 => println!("No verbose info"),
-        1 => println!("Some verbose info"),
-        2 => println!("Tons of verbose info"),
-        3 | _ => println!("Don't be crazy"),
+    let output_file_path = matches.value_of("OUTPUT").unwrap();
+    let output_file = OpenOptions::new().write(true).create(true).open(output_file_path);
+
+    let pattern_string = matches.values_of("pattern").unwrap();
+    let mut patterns: Vec<Pattern> = vec![];
+    for p in pattern_string {
+        let mut pattern_init = p.split(',');
+        let int_value: usize = (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
+        let value: [u8; 8] = int_value.to_be_bytes();
+        let value = remove_leading_zeros(&value.to_vec());
+        let int_mask: usize = (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
+        let mask: [u8; 8] = int_mask.to_be_bytes();
+        let mask = remove_leading_zeros(&mask.to_vec());
+        let periodicity: usize = (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
+        let offset: usize = (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
+
+        patterns.push(Pattern::new(value, mask, periodicity, offset));
+
     }
 
-    // You can handle information about subcommands by requesting their matches by name
-    // (as below), requesting just the name used, or both at the same time
-    if let Some(matches) = matches.subcommand_matches("test") {
-        if matches.is_present("debug") {
-            println!("Printing debug info...");
-        } else {
-            println!("Printing normally...");
+    match (input_file, output_file) {
+        (Err(e), _) => println!("error while opening {}: {}", input_file_path, e),
+        (_, Err(e)) => println!("error while opening {}: {}", output_file_path, e),
+        (Ok(input), Ok(output)) => {
+            let reader = BufReader::new(input);
+            let mut writer = BufWriter::new(output);
+
+            let mut value: u8;
+            for (position, b) in reader.bytes().enumerate() {
+                if let Ok(byte) = b {
+                    value = byte;
+                    for pattern in &patterns {
+                        value = pattern.compute_pattern(position, value);
+                    }
+                    writer.write_all(&[value]).expect("write error");
+                }
+            }
         }
     }
-
-    // more program logic goes here...
 }
