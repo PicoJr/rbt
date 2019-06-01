@@ -53,10 +53,22 @@ pub mod pattern {
         offset: usize,
     }
 
+    fn remove_leading_zeros(v: &[u8]) -> Vec<u8> {
+        let mut non_zero_found = false;
+        let mut rv: Vec<u8> = vec![];
+        for &e in v {
+            if e != 0 {
+                non_zero_found = true;
+                rv.push(e);
+            } else if e == 0 && non_zero_found {
+                rv.push(e);
+            }
+        }
+        rv
+    }
+
     impl Pattern {
         pub fn new(value: Vec<u8>, mask: Vec<u8>, periodicity: usize, offset: usize) -> Self {
-            println!("value {:?}", value);
-            println!("mask {:?}", mask);
             Pattern {
                 value,
                 mask,
@@ -77,6 +89,35 @@ pub mod pattern {
             } else {
                 value
             }
+        }
+
+        pub fn from_string(pattern_str: &str) -> Result<Pattern, &'static str> {
+            let mut pattern_init = pattern_str.split(',');
+            let int_value: usize;
+            match pattern_init.next().unwrap().parse::<usize>() {
+                Err(_) => return Err("error while parsing pattern"),
+                Ok(value) => int_value = value,
+            }
+            let value: [u8; 8] = int_value.to_be_bytes();
+            let value = remove_leading_zeros(&value.to_vec());
+            let int_mask: usize;
+            match pattern_init.next().unwrap().parse::<usize>() {
+                Err(_) => return Err("error while parsing pattern"),
+                Ok(value) => int_mask = value,
+            }
+            let mask: [u8; 8] = int_mask.to_be_bytes();
+            let mask = remove_leading_zeros(&mask.to_vec());
+            let periodicity: usize;
+            match pattern_init.next().unwrap().parse::<usize>() {
+                Err(_) => return Err("error while parsing pattern"),
+                Ok(value) => periodicity = value,
+            }
+            let offset: usize;
+            match pattern_init.next().unwrap().parse::<usize>() {
+                Err(_) => return Err("error while parsing pattern"),
+                Ok(value) => offset = value,
+            }
+            Ok(Pattern::new(value, mask, periodicity, offset))
         }
     }
 }

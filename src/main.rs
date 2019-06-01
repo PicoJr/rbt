@@ -9,20 +9,6 @@ use rbt::pattern::Pattern;
 
 const BUFFER_SIZE: usize = 4000; // 4KB
 
-fn remove_leading_zeros(v: &[u8]) -> Vec<u8> {
-    let mut non_zero_found = false;
-    let mut rv: Vec<u8> = vec![];
-    for &e in v {
-        if e != 0 {
-            non_zero_found = true;
-            rv.push(e);
-        } else if e == 0 && non_zero_found {
-            rv.push(e);
-        }
-    }
-    rv
-}
-
 fn main() {
     let matches = App::new("ReplaceBytesTool")
         .version("1.0")
@@ -50,21 +36,14 @@ fn main() {
     let pattern_string = matches.values_of("pattern").unwrap();
     let mut patterns: Vec<Pattern> = vec![];
     for p in pattern_string {
-        let mut pattern_init = p.split(',');
-        let int_value: usize =
-            (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
-        let value: [u8; 8] = int_value.to_be_bytes();
-        let value = remove_leading_zeros(&value.to_vec());
-        let int_mask: usize =
-            (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
-        let mask: [u8; 8] = int_mask.to_be_bytes();
-        let mask = remove_leading_zeros(&mask.to_vec());
-        let periodicity: usize =
-            (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
-        let offset: usize =
-            (pattern_init.next().unwrap().parse::<usize>()).expect("could not parse pattern");
-
-        patterns.push(Pattern::new(value, mask, periodicity, offset));
+        match Pattern::from_string(p) {
+            Ok(pattern) => {
+                patterns.push(pattern);
+            }
+            Err(e) => {
+                println!("{}", e);
+            }
+        }
     }
 
     match (input_file, output_file) {
@@ -76,6 +55,7 @@ fn main() {
 
             let mut position = 0;
             let mut buffer = [0; BUFFER_SIZE];
+
             while let Ok(size) = reader.read(&mut buffer) {
                 if size == 0 {
                     break;
